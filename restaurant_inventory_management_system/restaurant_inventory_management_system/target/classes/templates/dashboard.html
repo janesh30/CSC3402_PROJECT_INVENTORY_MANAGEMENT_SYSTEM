@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <title>Dashboard - Stock Control</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; }
+        .navbar { display: flex; justify-content: space-between; align-items: center; background: #343a40; color: white; padding: 10px 20px; border-radius: 4px; margin-bottom: 20px; }
+        .navbar h2 { margin: 0; font-size: 20px; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .logout-btn { color: #ffc107; text-decoration: none; font-weight: bold; }
+        .container { background: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        /* Search, Export, and Filters */
+        .search-form { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .search-input { padding: 10px; width: 300px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
+        .filter-select { padding: 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; background-color: white; }
+        .btn-search { padding: 10px 20px; background: #343a40; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-clear { padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; }
+        .export-btn { background: #28a745; color: white; text-decoration: none; padding: 10px 15px; border-radius: 4px; font-weight: bold; margin-right: 15px; }
+
+        /* Flash Messages */
+        .alert { padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid transparent; }
+        .alert-success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+
+        .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #f8f9fa; padding-bottom: 15px; }
+        .add-btn { background: #007bff; color: white; text-decoration: none; padding: 10px 15px; border-radius: 4px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; }
+        th { background-color: #e9ecef; color: #495057; }
+        .action-links a { text-decoration: none; margin-right: 10px; font-weight: bold; cursor: pointer; }
+        .edit-lnk { color: #007bff; }
+        .del-lnk { color: #dc3545; }
+        .alert-low { background-color: #f8d7da; color: #721c24; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+        .role-badge { background: #17a2b8; padding: 3px 8px; border-radius: 12px; font-size: 12px; }
+
+        /* Pagination Controls */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 25px; }
+        .pagination a { padding: 8px 12px; background: #e9ecef; color: #343a40; text-decoration: none; border-radius: 4px; font-weight: bold; }
+        .pagination a:hover { background: #ced4da; }
+        .pagination span { font-size: 14px; color: #495057; }
+
+        /* Modal Styles */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 350px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .modal-actions { margin-top: 20px; display: flex; justify-content: center; gap: 15px; }
+        .btn-cancel { padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-confirm-del { padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 4px; text-decoration: none; display: inline-block; }
+    </style>
+</head>
+<body>
+<div class="navbar">
+    <h2>Restaurant Stock Inventory Dashboard</h2>
+    <div class="user-info">
+            <span>Welcome, <strong sec:authentication="name">User</strong>
+                  <span class="role-badge" sec:authentication="principal.authorities">Role</span>
+            </span>
+        <a th:href="@{/logout}" class="logout-btn">Logout</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <div th:if="${successMessage}" class="alert alert-success">
+        <strong th:text="${successMessage}">Action completed successfully!</strong>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger">
+        <strong th:text="${errorMessage}">An error occurred!</strong>
+    </div>
+
+    <div style="width: 100%; height: 250px; margin-bottom: 30px; border-bottom: 1px solid #dee2e6; padding-bottom: 20px;">
+        <canvas id="stockChart"></canvas>
+    </div>
+
+    <form th:action="@{/dashboard}" method="get" class="search-form">
+        <input type="text" name="keyword" th:value="${keyword}" class="search-input" placeholder="Search by ingredient name (e.g., Chicken)...">
+
+        <select name="category" class="filter-select">
+            <option value="">-- All Categories --</option>
+            <option th:each="cat : ${categories}"
+                    th:value="${cat.id}"
+                    th:text="${cat.name}"
+                    th:selected="${cat.id == selectedCategoryId}">Dairy</option>
+        </select>
+
+        <button type="submit" class="btn-search">Search & Filter</button>
+        <a th:href="@{/dashboard}" class="btn-clear">Reset</a>
+    </form>
+
+    <div class="top-actions">
+        <h3 style="margin: 0;">Active Ingredients Master List</h3>
+        <div style="display: flex; align-items: center;">
+            <a th:href="@{/ingredient/export}" class="export-btn">⬇ Export to Excel</a>
+            <span sec:authorize="hasRole('ADMIN')">
+                <a th:href="@{/ingredient/new}" class="add-btn">+ Add New Ingredient Instance</a>
+            </span>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Ingredient Name</th>
+            <th>Category</th>
+            <th>Quantity</th>
+            <th>UOM</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="ing : ${ingredients}">
+            <td th:text="${ing.id}">1</td>
+            <td th:text="${ing.name}">Milk</td>
+            <td th:text="${ing.category.name}">Dairy</td>
+            <td th:text="${ing.quantity}">5.00</td>
+            <td th:text="${ing.unitOfMeasure}">Liters</td>
+            <td>
+                <span th:if="${ing.quantity <= ing.minimumStock}" class="alert-low">LOW STOCK</span>
+                <span th:if="${ing.quantity > ing.minimumStock}">Optimal</span>
+            </td>
+            <td class="action-links">
+                <a th:href="@{/ingredient/update-stock/{id}(id=${ing.id})}" style="color: #28a745;">Update Stock</a>
+                <span sec:authorize="hasRole('ADMIN')">
+                    <a th:href="@{/ingredient/edit/{id}(id=${ing.id})}" class="edit-lnk" style="margin-left: 10px;">Full Edit</a>
+                    <a class="del-lnk" th:onclick="'openDeleteModal(' + ${ing.id} + ')'">Delete</a>
+                </span>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(ingredients)}">
+            <td colspan="7" style="text-align: center; color: #6c757d; padding: 20px;">No ingredients found matching your criteria.</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="pagination" th:if="${totalPages > 1}">
+        <a th:if="${currentPage > 1}" th:href="@{/dashboard(page=1, keyword=${keyword}, category=${selectedCategoryId})}">First</a>
+        <a th:if="${currentPage > 1}" th:href="@{/dashboard(page=${currentPage - 1}, keyword=${keyword}, category=${selectedCategoryId})}">Previous</a>
+
+        <span>Page <strong th:text="${currentPage}">1</strong> of <strong th:text="${totalPages}">5</strong></span>
+
+        <a th:if="${currentPage < totalPages}" th:href="@{/dashboard(page=${currentPage + 1}, keyword=${keyword}, category=${selectedCategoryId})}">Next</a>
+        <a th:if="${currentPage < totalPages}" th:href="@{/dashboard(page=${totalPages}, keyword=${keyword}, category=${selectedCategoryId})}">Last</a>
+    </div>
+
+</div>
+
+<div id="deleteModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 style="margin-top: 0; color: #dc3545;">Confirm Deletion</h3>
+        <p>Are you sure you want to delete this ingredient? This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <a id="confirmDeleteBtn" href="#" class="btn-confirm-del">Yes, Delete</a>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    /* --- Modal Logic --- */
+    function openDeleteModal(ingredientId) {
+        document.getElementById('deleteModal').style.display = 'flex';
+        // Dynamically set the href for the delete button
+        document.getElementById('confirmDeleteBtn').href = '/ingredient/delete/' + ingredientId;
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+    }
+
+    /* --- Chart Logic --- */
+    var inventoryData = /*[[${ingredients}]]*/ [];
+    var optimalCount = 0;
+    var lowCount = 0;
+
+    if(inventoryData && inventoryData.length > 0) {
+        inventoryData.forEach(function(item) {
+            if (item.quantity <= item.minimumStock) {
+                lowCount++;
+            } else {
+                optimalCount++;
+            }
+        });
+    }
+
+    const ctx = document.getElementById('stockChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Healthy Stock Levels', 'Low Stock / Depleted'],
+            datasets: [{
+                label: 'Number of Ingredients',
+                data: [optimalCount, lowCount],
+                backgroundColor: ['#28a745', '#dc3545'],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Real-Time Inventory Health', font: { size: 18 } }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+        }
+    });
+</script>
+</body>
+</html>

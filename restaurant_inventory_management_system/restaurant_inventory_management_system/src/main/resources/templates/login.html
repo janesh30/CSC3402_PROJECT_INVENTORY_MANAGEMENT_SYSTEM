@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Login - Restaurant Inventory</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 320px; }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #666; font-size: 14px; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .links { text-align: center; margin-top: 15px; font-size: 13px; }
+        .alert { color: red; text-align: center; margin-bottom: 10px; font-size: 14px; }
+        .success { color: green; text-align: center; margin-bottom: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <h2>System Login</h2>
+    <div th:if="${param.error}" class="alert">Invalid username or password.</div>
+    <div th:if="${param.logout}" class="success">Logged out successfully.</div>
+    <div th:if="${param.success}" class="success">Registration successful! Please log in.</div>
+
+    <form th:action="@{/login}" method="post">
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" name="username" required autofocus />
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required />
+        </div>
+        <button type="submit">Sign In</button>
+    </form>
+    <div class="links">
+        <a th:href="@{/register}">Create an Account</a>
+    </div>
+</div>
+</body>
+</html>
